@@ -1,0 +1,31 @@
+#lang racket
+;;;exp ::= int | (read) | (- exp) | (+ exp exp)
+;;;| var | (let ([var exp]) exp)
+;;;R1 ::= (program exp)
+
+(define (interp-R1 env)
+  (lambda (e)
+    (define recur (interp-R1 env))
+    (match e
+      [(? symbol?) (lookup e env)]
+      [`(let ([,x ,(app recur v)]) ,body)
+        (define new-env (cons (cons x v) env))
+        ((interp-R1 new-env) body)]
+      [(? fixnum?) e]
+      [`(read)
+        (define r (read))
+        (cond [(fixnum? r) r]
+              [else (error 'interp-R1 "expected an integer" r)])]
+      [`(- ,(app recur v))
+        (- 0 v)]
+      [`(+ ,(app recur v1) ,(app recur v2))
+        (+ v1 v2)]
+      [`(program ,e) ((interp-R1 '()) e)]
+      )))
+
+(define (lookup exp env)
+  (cond
+    [(null? env) (error exp "is not defined")]
+    [(eq? exp (caar env)) (cdar env)]
+    [else (lookup exp (cdr env))]
+    ))
