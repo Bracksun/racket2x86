@@ -1,6 +1,6 @@
 #lang racket
 ;;;exp ::= int | (read) | (- exp) | (+ exp exp)
-;;;      | var | (let ([var exp]) exp)
+;;;| var | (let ([var exp]) exp)
 ;;;R1 ::= (program exp)
 
 (define (interp-R1 env)
@@ -58,13 +58,3 @@
 ;;; instr ::= (addq arg arg) | (subq arg arg) | (negq arg) | (movq arg arg)
 ;;;         | (callq label) | (pushq arg) | (popq arg) | (retq)
 ;;; x86 ::= (program int instr+)
-
-
-
-;;; R_1 --(uniquify)--> R_1 --(flatten)--> C_0
-
-;;; C_0 intermediate language
-;;; arg ::= int | var
-;;; exp ::= arg | (read) | (- arg) | (+ arg arg)
-;;; stmt ::= (assign var exp) | (return arg)
-;;; C_0 ::= (program (var∗) stmt+)
