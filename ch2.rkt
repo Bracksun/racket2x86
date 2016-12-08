@@ -67,4 +67,22 @@
 ;;; arg ::= int | var
 ;;; exp ::= arg | (read) | (- arg) | (+ arg arg)
 ;;; stmt ::= (assign var exp) | (return arg)
-;;; C_0 ::= (program (var∗) stmt+)
+;;; C_0 ::= (program (var*) stmt+)
+
+
+;;; C_0 --(select-instr)--> X86* --(assign-homes)--> X86* --(patch-instr)--> X86
+
+;;; Implementation of uniquify pass
+(define (uniquify alist)
+  (lambda (e)
+    (match e
+      [(? symbol?) (if (null? alist) e (car alist))]
+      [(? integer?) e]
+      [`(let ([,x ,e]) ,body) (let ([uni-x (gensym x)])
+                                `(let ([,uni-x ,((uniquify alist) e)]) ,((uniquify (cons uni-x alist)) body)))]
+      [`(program ,e)
+       `(program ,((uniquify alist) e))]
+      [`(,op ,es ...)
+       `(,op ,@(map (uniquify alist) es))] ;;use of comma-@ operator to splice a list of S-expressions into an enclosing S-expression.
+)))
+(define unify (uniquify '()))
