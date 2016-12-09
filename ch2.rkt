@@ -86,3 +86,31 @@
        `(,op ,@(map (uniquify alist) es))] ;;use of comma-@ operator to splice a list of S-expressions into an enclosing S-expression.
 )))
 (define unify (uniquify '()))
+
+;;; helper function
+;;; map3 function is useful for applying a function to each element fo a list, in the case where the function returns three values.
+;;; The result of map3 is three lists.
+(define (map3-internal rlist1 rlist2 rlist3)
+  (lambda (f e-list)
+    (cond
+      [(null? e-list) (values rlist1 rlist2 rlist3)]
+      [else (let-values ([(r1 r2 r3) (f (car e-list))])
+                   ((map3-internal (cons r1 rlist1)
+                                   (cons r2 rlist2)
+                                   (cons r3 rlist3)) f (cdr e-list)))]
+      )))
+(define map3 (map3-internal '() '() '()))
+
+(define (flatten assign-lst var-lst) 
+  (lambda (e)
+    (match e
+      [(? symbol?) ]
+      [(? integer?) ]
+      [`(let ([,x ,e]) ,body)
+       (let-values ([(r-new-exp r-assign-lst r-var-lst) ((flatten assign-lst exp-lst) e)])
+         ((flatten (cons `(assign ,x ,r-new-exp) r-assign-lst) (cons x r-var-lst)) body))]
+      [`(program ,e)
+       (let-values ([(r-new-exp r-assign-lst r-var-lst) ((flatten assign-lst exp-lst) e)])
+         (append (cons 'program (cons r-var-lst r-assign-lst)) `(return ,r-new-exp)))]
+      [`(,op ,es
+                                                         
