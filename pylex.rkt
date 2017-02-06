@@ -68,9 +68,15 @@
                            (begin (pop-indent!)
                                   (cons `(DEDENT) (pop-indents!))))) 
 
+(define paren-dict (make-hash '((")" . "(") ("]" . "[") ("}" . "{"))))
+(define left-parens (list "(" "[" "{"))
+(define right-parens (list ")" "]" "}"))
 (define paren-stack '())
 (define (push-paren! char) (set! paren-stack (cons char paren-stack)))
-(define (pop-paren! char) (error "implement me!"))
+(define (pop-paren! char)
+  (if (and (not (null? paren-stack)) (eq? (dict-ref paren-dict char) (car paren-stack)))
+      (set! paren-stack (cdr paren-stack))
+      (error char "not matched")))
 
 (define (list->string lst)
   (if (null? lst)
@@ -122,12 +128,18 @@
 
 (define pylex
   (lexer
+    ; For debugging
+    [(:: #\x #\x #\x) (cons `(ID ,lexeme) (pylex input-port))]
     ; end of file
     [(eof) '((ENDMARKER))]
     ; comment 
-    [hash-comment (cons '(NEWLINE) (indent-lexer input-port))]
+    [hash-comment (if (null? paren-stack)
+                      (cons '(NEWLINE) (indent-lexer input-port))
+                      (pylex input-port))]
     ; newline
-    [NEWLINE (cons '(NEWLINE) (indent-lexer input-port))]
+    [NEWLINE (if (null? paren-stack)
+                 (cons '(NEWLINE) (indent-lexer input-port))
+                 (pylex input-port))]
     ; space
     [#\space (pylex input-port)]
     ; explicit lne joining \/n
@@ -136,11 +148,17 @@
     [string-quote  (let ([sval (strlex input-port)])
                          (cons `(LIT ,(list->string sval)) (pylex input-port)))]
     ; keyword
-    [keyword (cons `(KEYWORD ,(string->symbol lexeme)) (pylex input-port))]
+    [keyword  (cons `(KEYWORD ,(string->symbol lexeme)) (pylex input-port))]
     ; operator
     [operator (cons `(PUNCT ,lexeme) (pylex input-port))]
     ; delimiter
-    [delimiter (cons `(PUNCT ,lexeme) (pylex input-port))]
+    [delimiter
+     (begin
+       (cond
+         [(memq lexeme left-parens) (push-paren! lexeme)]
+         [(memq lexeme right-parens) (pop-paren! lexeme)]
+         [else (void)])
+       (cons `(PUNCT ,lexeme) (pylex input-port)))]
     ; identifier
     [identifier (cons `(ID ,lexeme) (pylex input-port))]
     ; LIT
