@@ -21,7 +21,7 @@
 (define-lex-abbrev octinteger (:: "0" (:or "o" "O") (:+ octdigit)))
 (define-lex-abbrev hexinteger (:: "0" (:or "x" "X") (:+ hexdigit)))
 (define-lex-abbrev bininteger (:: "0" (:or "b" "B") (:+ bindigit)))
-(define-lex-abbrev decimalinteger (:: nonzerodigit (:* digit)))
+(define-lex-abbrev decimalinteger (:or "0" (:: nonzerodigit (:* digit))))
 (define-lex-abbrev intpart (:+ digit))
 (define-lex-abbrev fraction (:: "." intpart))
 (define-lex-abbrev pointfloat (:or (:: (:? intpart) fraction) (:: intpart ".")))
@@ -113,6 +113,7 @@
    [(eof) (error "meet EOF in string")]
    [(:: #\\ #\newline) (strlex input-port)]
    [(:: #\\ #\") (cons "\"" (strlex input-port))]
+   [(:: #\\ #\') (cons "\'" (strlex input-port))]
    [(:: #\\ #\\) (cons "\\" (strlex input-port))]
    [(:: #\\ #\n) (cons "\n" (strlex input-port))]
    [string-quote '()] ;; terminate
@@ -124,7 +125,7 @@
     ; end of file
     [(eof) '((ENDMARKER))]
     ; comment 
-    [hash-comment (indent-lexer input-port)]
+    [hash-comment (cons '(NEWLINE) (indent-lexer input-port))]
     ; newline
     [NEWLINE (cons '(NEWLINE) (indent-lexer input-port))]
     ; space
@@ -148,7 +149,7 @@
     [(:or octinteger hexinteger bininteger decimalinteger floatnumber)
      (cons `(LIT ,(string->number lexeme)) (pylex input-port))]
     ;; To be completed
-    [any-char (pylex input-port)]
+    ;[any-char (pylex input-port)]
     ))
 
 
