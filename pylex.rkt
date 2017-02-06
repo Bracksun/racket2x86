@@ -34,7 +34,7 @@
 (define-lex-abbrev id_start (:or lower-case upper-case title-case "_"))
 (define-lex-abbrev id_continue (:or id_start numeric))
 
-(define-lex-abbrev string-quote (:: (:? (:or "r" "R" "f" "F")) #\" (complement (:: any-string #\" any-string)) #\"))
+(define-lex-abbrev string-quote #\")
 (define-lex-abbrev keyword (:or "False"      "class"      "finally"    "is"         "return"
                                 "None"       "continue"   "for"        "lambda"     "try"
                                 "True"       "def"        "from"       "nonlocal"   "while"
@@ -63,12 +63,19 @@
     (error "indent-stack is empty")
     (set! indent-stack (cdr indent-stack))))
 (define (measure-spaces!) (error "implement me!"))
-(define (pop-indents!) (set! indent-stack '()))
+(define (pop-indents!) (if (eq? (current-indent) current-spaces)
+                           '()
+                           (begin (pop-indent!)
+                                  (cons `(DEDENT) (pop-indents!))))) 
 
 (define paren-stack '())
 (define (push-paren! char) (set! paren-stack (cons char paren-stack)))
 (define (pop-paren! char) (error "implement me!"))
 
+(define (list->string lst)
+  (if (null? lst)
+      ""
+      (string-append (car lst) (list->string (cdr lst)))))
 ;(define (whitespace-ignored?) (error "implement me!"))
 ;(define (octal-digit? char) (error "implement me!"))
 ;(define (hex-digit? char) (error "implement me!"))
@@ -101,6 +108,17 @@
 ;(set! input (open-input-string (port->string input)))
 (define input (open-input-file "lexer.input"))
 
+(define strlex
+  (lexer
+   [(eof) (error "meet EOF in string")]
+   [(:: #\\ #\newline) (strlex input-port)]
+   [(:: #\\ #\") (cons "\"" (strlex input-port))]
+   [(:: #\\ #\\) (cons "\\" (strlex input-port))]
+   [(:: #\\ #\n) (cons "\n" (strlex input-port))]
+   [string-quote '()] ;; terminate
+   [any-char (cons lexeme (strlex input-port))]
+   ))
+
 (define pylex
   (lexer
     ; end of file
@@ -108,11 +126,14 @@
     ; comment 
     [hash-comment (indent-lexer input-port)]
     ; newline
-    [NEWLINE (indent-lexer input-port)]
+    [NEWLINE (cons '(NEWLINE) (indent-lexer input-port))]
     ; space
     [#\space (pylex input-port)]
     ; explicit lne joining \/n
     [(:: #\\ #\newline) (pylex input-port)]
+    ; string-quote
+    [string-quote  (let ([sval (strlex input-port)])
+                         (cons `(LIT ,(list->string sval)) (pylex input-port)))]
     ; keyword
     [keyword (cons `(KEYWORD ,(string->symbol lexeme)) (pylex input-port))]
     ; operator
@@ -146,18 +167,18 @@
     [#\tab (begin
              (inc-tab!)
              (indent-lexer input-port))]
-
+    [hash-comment (begin (reset-spaces!) (indent-lexer input-port))]
     [any-char (begin
                 (unget input-port)
                 (cond
                   [(eq? (current-indent) current-spaces) (reset-spaces!) (pylex input-port)]
                   [(< (current-indent) current-spaces)
                    (push-indent! current-spaces) (reset-spaces!) (cons '(INDENT) (pylex input-port))]
-                  [else (pop-indent!) (reset-spaces!) (cons '(DEDENT) (pylex input-port))]))]
+                  [else (let ([dedents (pop-indents!)]) ; dedent
+                          (begin (reset-spaces!) (append dedents (pylex input-port))))]))]
     ))
 
     
-
 ;; driver
 (define tokens (indent-lexer input))
 (for ((token tokens)) (write token) (newline))
